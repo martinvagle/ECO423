@@ -1,30 +1,19 @@
-# initialise the environment
-rm(list = ls())
-
-# Variables
-r = 0.05
-sigma = 0.25
-S0 = 100
-T = 5
-K = 165
-N = 50000
+#Variables
+r = 0.05; sigma = 0.25; S0 = 100; T = 5; K = 165; N = 50000;
 
 # Black Scholes components
 d1 = (log(S0/K) + (r + sigma^2/2)*T)/(sigma*sqrt(T))
 d2 = d1 - sigma*sqrt(T)
 
 # Black Scholes price
-BSM = S0 * pnorm(d1) - K * exp(-r * T) * pnorm(d2)
-BSM
-
-# setting seed for reproducibility
-set.seed(1)
+BSM = S0 * pnorm(d1) - K * exp(-r * T) * pnorm(d2); BSM
 
 # generate N standard normal random variates
+set.seed(1)
 X = rnorm(N)
 
 # generate N possible date T stock prices under the equivalent martingale measure
-ST = S0 * exp((r - sigma^2/2) * T + sigma * sqrt(T) * X)
+ST = S0 * exp((r - sigma^2/2) * T + sigma * sqrt(T) * X) #using r instead of mu
 
 hist(ST, breaks = 100, col = "lightblue", 
 main = "Histogram of Stock Prices at T", 
@@ -34,27 +23,20 @@ mean(ST)
 
 # generate call option payoffs that correspond to the N possible stock prices
 CT = pmax(ST - K, 0)
-mean(CT)
-hist(CT, breaks = 100, col = "lightblue",
-main = "Histogram of Call Option Payoffs at T",
-xlab = "Call Option Payoff at T", ylab = "Frequency")
 
 # approximate expectation of the call with discounted mean of CT
 BSMmc = mean(CT) * exp(-r * T)
 mean(BSMmc)
 
 # standard error of the mean
-SEM = sd(CT * exp(-r * T))/sqrt(N)
-SEM
+SEM = sd(CT * exp(-r * T))/sqrt(N); SEM
 
 # 95% confidence interval
-BSMmc + c(-1, 1) * 1.96 * SEM
-
-# assign upper limit to uci
-uci = BSMmc + 1.96 * SEM
-
+ci = BSMmc + c(-1, 1) * 1.96 * SEM
 # assign lower limit to lci
-lci = BSMmc - 1.96 * SEM
+lci = ci[1]
+# assign upper limit to uci
+uci = ci[2]
 
 uci; lci
 
@@ -80,100 +62,68 @@ aBSMmc = mean(aCT) * exp(-r * T)
 aSEM = sd(aCT * exp(-r * T))/sqrt(N)
 
 # 95% confidence interval
-aBSMmc + c(-1, 1) * 1.96 * aSEM
-
-# assign upper limit to uci
-auci = aBSMmc + 1.96 * aSEM
-
-# assign lower limit to lci
-alci = aBSMmc - 1.96 * aSEM
-
+aci = aBSMmc + c(-1, 1) * 1.96 * aSEM
+alci = aci[1]
+auci = aci[2]
 auci; alci
 
 # indicator function
 if (BSM < auci & BSM > alci) 1 else 0
-
 ### Nice, checks out ###
 
-# antithetic variate mean
-BSMav = (BSMmc + aBSMmc)/2
-
-# average option payoff
-CTav = (CT + aCT)/2
-head(CTav)
+# Average of the normal and antithetic variates
+BSMav = (BSMmc + aBSMmc)/2 #Price
+CTav = (CT + aCT)/2 #Payoff
 
 # standard error of the mean CTav
-avSEM = sd(CTav * exp(-r * T))/sqrt(N)
-avSEM
+avSEM = sd(CTav * exp(-r * T))/sqrt(N); avSEM
 
 # 95% confidence interval
-BSMav + c(-1, 1) * 1.96 * avSEM
-
-# assign upper limit to uci
+avSD = BSMav + c(-1, 1) * 1.96 * avSEM
 avuci = BSMav + 1.96 * avSEM
-
-# assign lower limit to lci
 avlci = BSMav - 1.96 * avSEM
-
 avuci; avlci
 
 # indicator function
 if (BSM < avuci & BSM > avlci) 1 else 0
-
-### Nice, checks out ###
+# The % improvement in SEM from antithetic variates technique:
+(SEM/sqrt(2)-avSEM) / (SEM/sqrt(2))
 
 # Monte Carlo simulation
-# initialise the environment
-rm(list = ls())
-set.seed(1)
+# Step 15
+ctrBSMmc = 0; ctraBSMmc = 0; ctrBSMav = 0
 
-# Variables
-r = 0.05
-sigma = 0.25
-S0 = 100
-T = 5
-K = 165
-N = 50000
-ctrBSMmc = 0 ; ctraBSMmc = 0 ; ctrBSMav = 0
-
-# Black Scholes components
-d1 = (log(S0/K) + (r + sigma^2/2)*T)/(sigma*sqrt(T))
-d2 = d1 - sigma*sqrt(T)
-
-# Black Scholes price
-BSM = S0 * pnorm(d1) - K * exp(-r * T) * pnorm(d2)
-
-for (i in 1:100) {
-    X = rnorm(N)
-    ST = S0 * exp((r - sigma^2/2) * T + sigma * sqrt(T) * X)
-    CT = pmax(ST - K, 0)
-    BSMmc = mean(CT) * exp(-r * T)
-    SEM = sd(CT * exp(-r * T))/sqrt(N)
-    uci = BSMmc + qnorm(1 - 0.05 / 2) * SEM
-    lci = BSMmc + qnorm(0.05 / 2) * SEM
-    if (BSM < uci & BSM > lci) {
-        ctrBSMmc = ctrBSMmc + 1
-    }
-
-    aX = -X
-    aST = S0 * exp((r - sigma^2/2) * T + sigma * sqrt(T) * aX)
-    aCT = pmax(aST - K, 0)
-    aBSMmc = mean(aCT) * exp(-r * T)
-    aSEM = sd(aCT * exp(-r * T))/sqrt(N)
-    auci = aBSMmc + qnorm(1 - 0.05 / 2) * aSEM
-    alci = aBSMmc + qnorm(0.05 / 2) * aSEM
-    if (BSM < auci & BSM > alci) {
-        ctraBSMmc = ctraBSMmc + 1
-    }
-
-    CTav = (CT + aCT)/2
-    BSMav = (BSMmc + aBSMmc)/2
-    avSEM = sd(CTav * exp(-r * T))/sqrt(N)
-    avuci = BSMav + qnorm(1 - 0.05 / 2) * avSEM
-    avlci = BSMav + qnorm(0.05 / 2) * avSEM
-    if (BSM < avuci & BSM > avlci) {
-        ctrBSMav = ctrBSMav + 1
-    }
+for(i in 1:100) {
+  X = rnorm(N)
+  ST = S0*exp((r-sigma^2/2)*T + sigma*sqrt(T)*X)
+  CT = pmax(ST-K,0)
+  BSMmc = exp(-r*T)*mean(CT)
+  sdBSMmc = sd(CT*exp(-r*T))/sqrt(N)
+  uci = BSMmc + qnorm(1-0.05/2)*sdBSMmc
+  lci = BSMmc + qnorm(0.05/2)*sdBSMmc
+  if(BSM < uci & BSM > lci) {
+    ctrBSMmc = ctrBSMmc + 1
+  }
+  
+  aX = -X
+  aST = S0*exp((r-sigma^2/2)*T + sigma*sqrt(T)*aX)
+  aCT = pmax(aST-K,0)
+  aBSMmc = exp(-r*T)*mean(aCT)
+  asdBSMmc = sd(aCT*exp(-r*T))/sqrt(N)
+  auci = aBSMmc + qnorm(1-0.05/2)*asdBSMmc
+  alci = aBSMmc + qnorm(0.05/2)*asdBSMmc
+  if(BSM < auci & BSM > alci) {
+    ctraBSMmc = ctraBSMmc + 1
+  }
+  
+  CTav = (CT+aCT)/2
+  BSMav = exp(-r*T)*mean(CTav) # = (BSMmc+aBSMmc)/2
+  sdBSMav = sd(CTav*exp(-r*T))/sqrt(N)
+  uciAv = BSMav + qnorm(1-0.05/2)*sdBSMav
+  lciAv = BSMav + qnorm(0.05/2)*sdBSMav
+  if(BSM < uciAv & BSM > lciAv) {
+    ctrBSMav = ctrBSMav + 1
+  }
 }
 
 ctrBSMmc; ctraBSMmc; ctrBSMav
